@@ -333,7 +333,7 @@ setSession(authResult) {
 }
 ```
 
-The `setSession` is a private method which uses the `accessToken` field provided by `handleAuthentication` to fetch user data from Auth0 server. The server provides details like email and role. The role received is the one computed by the function we saved on Auth0 dashboard. In our case, it will be available via `data["https://rbac-tutorial-app/role"]`. All the necessary user data are stored in `Auth` component's state.
+The `setSession` is a private method which uses the `accessToken` field provided by `handleAuthentication` to fetch user data from Auth0 server via `auth.client.userInfo` method. The server provides details like email and role. The role received is the one computed by the function we saved on Auth0 dashboard. In our case, it will be available via `data["https://rbac-tutorial-app/role"]`. All the necessary user data are stored in `Auth` component's state.
 
 Finally, to log the user out we just delete the stored user data in the state and revert the role to visitor.
 
@@ -487,15 +487,38 @@ Here, we are checking if user is authenticated. If they are we redirect them to 
 
 ## Basic Way to do Authorization
 
+We can use the user role and have `if` conditionals to conditionally render certain parts of UI. It can look like this
+
+```js
+renderButton(user) {
+  const markup = [];
+  if(user.role === 'admin' || user.role === 'writer') {
+    markup.push(
+      <button>
+        Action Button
+      </button>
+    )
+  } else {
+    markup.push(
+      <span>Action Not Allowed</span>
+    )
+  }
+  return markup;
+}
+```
+
+This can get the job done but there are many small issues hidden here that will show their ugly face when we scale. Let's look at each one.
+
 ### Flaws
 
 1. When requirements change, we'll have to check each and every condition related to authorization and may have to update them. This is not at all scalable.
 1. For each new role added, the whole codebase has to be modified.
 1. Code is imperative whereas React preaches decalarative code as it is easier to follow.
-1. There is more room for bugs to hide.
+1. There is more room for bugs to hide. As more conditions are added to accommodate the authorization logic, more conditional expressions will have to be placed. Having a combination of those can quickly become overwhelming. There might be unknown effects of the combination of the conditionals. It might happen that because we add a new role, the resulting logic now allows access to visitor also which wasn't desired. Proper tests can catch them but there must be better ways.
 1. Code duplication occurs at a lot of places.
 
 ## Better Solution (RBAC Authorization)
+RBAC Authorization is a great way to solve these issues. Let's see more about it.
 
 ### What is RBAC
 
@@ -509,7 +532,13 @@ RBAC is an acronym for Role Based Access Control. It is a scheme in which we def
 
 ## Implementation of RBAC
 
+### Make a file containing all the rules
+There will be two types of rules for each user role, static and dynamic. Static rules are those rules which don't need any data apart from user role. Dynamic rules are rules which need additional data to determine access. Dynamic rules are helpful when say we have to only allow the writer who is the owner of a resource.
 
+### Implement Can component
+Can component takes the RBAC rules and decide that given some data, can the user perform a task or can they see some part of UI.
+
+### Use the Can component
 
 ## Where to go from here
 
