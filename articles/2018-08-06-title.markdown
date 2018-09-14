@@ -1,8 +1,10 @@
 
+
+
 ---
 layout: post
 title: "Role Based Authorization in React"
-description: "Authorization is very crucial in your apps. A blog author should be prevented from deleting other's blogs. Read on to know how to implement this in react."
+description: "Authorization is very crucial in your apps. A blog author should be prevented from deleting other's blogs. Read on to know how to implement this in React."
 date: "2018-08-06 08:30"
 author:
   name: "Aditya Agarwal"
@@ -13,7 +15,7 @@ related:
 - 2017-11-15-an-example-of-all-possible-elements
 ---
 
-**TL;DR:** This is a guide for implementing role based authorization. Learn how to customize the app experience based on each user. All the code is available on [github](https://github.com/itaditya/react-rbac-auth0-article-code).
+**TL;DR:** This is a guide for implementing role based authorization. First we'll learn what is Authorization. Then we''ll look at a naive implementation and then we'll learn what RBAC is, how it's a much better solution and how we can implement it in React. All the code is available on [GitHub](https://github.com/itaditya/react-rbac-auth0-article-code).
 
 ## Introduction
 
@@ -31,7 +33,7 @@ An authenticated user is a user whose identity has been confirmed. It doesn't de
 
 Since many of the heavy lifting is now performed on the client side, the scope of authorization has now increased more than ever.
 
-A solid authorization system has to -
+A solid authorization system has to:
 * Limit the AJAX requests performed.
 * Deny access to certain client side routes.
 * Display or hide certain pieces of UI.
@@ -41,7 +43,7 @@ Suppose we are building the next [Medium](https://medium.com/).  When we visit o
 ## Authorization system in a blogging app
 Let's get a deeper understanding of authorization by building a blogging app in React.
 
-The blogging app has these requirements-
+The blogging app has these requirements:
 1. There are two pages, Home and Dashboard.
 1. Home page will show a list of all posts written and can be visited by anyone without even logging in.
 1. Dashboard page will show the logged in user details and a list of all posts written. The page can be visited by writers and admins only.
@@ -49,29 +51,42 @@ The blogging app has these requirements-
 
 To implement this, we need to authenticate a user and allot a role to the user. Based on the role, we can choose to render the edit and delete buttons. On the same basis we can redirect users from dashboard route to home route if no user is currently logged in.
 
-We'll use Auth0 to quickly add authentication in our react app without any need for backend.
+We'll use Auth0 to quickly add authentication in our React app without any need for backend.
 
-**Note-** Authorization in this tutorial doesn't depend on Auth0. Skip the auth0 part if you already have an authentication system in place and just want to know more about Authorization and ACL.
+**Note-** Authorization in this tutorial doesn't depend on Auth0. Skip the Auth0 part if you already have an authentication system in place and just want to know more about Authorization and ACL.
 
 ## Authentication in React App with Auth0
 
-Let's make a React app with CRA like this
+Let's create a new React app with the help of the `create-react-app` tool:
 
 ```bash
-$ create-react-app rbac-tutorial-app
+create-react-app rbac-tutorial-app
 ```
 
-Now `cd` into the newly created project and then create these files and folders so the directory structure looks like
+Now `cd` into the newly created project and then run these commands.
 
-![Folder Structure](/1-initial-folder-structure.png)
-
-*Notice, we have deleted the App.js, App.css and App.test.js*
+```bash
+cd src/
+rm App.js App.test.js App.css index.css logo.svg registerServiceWorker.js
+mkdir components pages
+touch pages/dashboard.js pages/home.js
+```
 
 The directory structure is such that
 * The components directory will hold all the reusable components.
 * For each route there will be a component in pages directory.
 
-Next open `src/index.js` and paste this code.
+It should now look like this:
+
+![Folder Structure](/1-initial-folder-structure.png)
+
+Now let's install `react` and `react-router-dom` :
+
+```bash
+npm install react react-router-dom
+```
+
+Next open `src/index.js` and replace its code with the following one:
 
 ```js
 import React from 'react';
@@ -89,7 +104,6 @@ function App() {
           <Switch>
             <Route exact path="/" component={HomePage} />
             <Route path="/dashboard" component={DashboardPage} />
-            <Route path="/callback" component={CallbackPage} />
           </Switch>
         </Router>
       </div>
@@ -101,9 +115,7 @@ const rootElement = document.getElementById('root');
 ReactDOM.render(<App />, rootElement);
 ```
 
-It defines two routes, one for home and one for dashboard.
-
-Now let's code both the pages. Open `src/pages/home.js` and paste this
+We use `react-router-dom` to define two routes, one for home and one for dashboard. Let's code both the pages. Open `src/pages/home.js` and paste this
 
 ```js
 import React from 'react';
@@ -126,25 +138,29 @@ const DashboardPage = () => (
 export default DashboardPage;
 ```
 
-With that covered, let's fire up the local dev server with `$ npm start`. It will run the app in browser on port 3000.
+With that covered, let's fire up the local dev server with `npm start`. It will run the app in browser on port 3000.
 
 On visiting http://localhost:3000, the page will have a heading of **Home** and on visiting http://localhost:3000/dashboard the heading will be **Dashboard**.
 
-Now we'll add authentication with Auth0 in the react app.
+Next, let's add Bootstrap to make the app more appealing. Open `index.html` in `public` folder and add this snippet in the `head` section.
+
+```
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.3/css/bootstrap.min.css">
+```
+
+Now we'll add authentication with Auth0 in the React app.
 
 ### Create Auth0 application
 
-Create an Auth0 account if there isn't one then go to the [Applications](https://manage.auth0.com/#/applications) page and create a new application. Name it **rbac-tutorial-app** and select **Single Page Web Application** type.
+Create an Auth0 account if there isn't one. Then go to the [Applications](https://manage.auth0.com/#/applications) page and create a new application. Name it **rbac-tutorial-app** and select **Single Page Web Application** type.
 
-Go to Settings Tab. There in the **Allowed Callback URLs** field put http://localhost:3000/callback and save it. Auth0 will redirect users to this url after authenticating them. Also keep the **Client ID** handy as we will use it later.
+Go to Settings Tab. There in the **Allowed Callback URLs** field put http://localhost:3000/callback and save it. Auth0 will redirect users to this URL after authenticating them. Also keep the **Client ID** handy as we will use it later.
 
 ### Configure Auth0 to assign a role to user
 
 Auth0 provides a way to assign roles to a user. Auth0 runs a function everytime someone logs in. We can customise the function code to suit our requirements.
 
-First go to the application dashboard and click on the **Rules** link in the sidebar. Then click on **Create Rule** button.
-
-Now pick the  **Set roles to a user** under the **Access Control** heading. There we have to paste this code.
+Visit this [page](https://manage.auth0.com/#/rules/new). Pick the  **Set roles to a user** option under the **Access Control** heading. It will open a code editor. There we have to paste this code.
 
 ```js
 function (user, context, callback) {
@@ -167,17 +183,18 @@ function (user, context, callback) {
 }
 ```
 
-We have told Auth0 to assign admin role to user with email your-email-id@gmail.com (Change the email id with yours). All other users will be assigned writer role.
+We have told Auth0 to assign admin role to user with email your-email-id@gmail.com (Change the email id with yours). All other users will be assigned writer role. Click the **Save** button to save the code.
 
 ### Integrate Auth0 with React app
 
 Let's add the auth0 library.
 
 ```bash
-$ npm install auth0-js
+npm install auth0-js
 ```
+The `auth0-js` library needs to configured with our application details. Then it returns an `auth`  instance which provides methods to start the login process, get user details etc. However, there is one complication, we have to provide this `auth` instance to multiple React components. There are many ways to do this but we'll use the new Context Api.
 
-Next create a file  named `auth0-variables.js` inside `src/constants`  directory.
+Create a file  named `auth0-variables.js` inside `src/constants`  directory.
 
 ```js
 export const AUTH_CONFIG = {
@@ -188,24 +205,6 @@ export const AUTH_CONFIG = {
 };
 ```
 
-Now we have to import `auth0-js` and configure it. The task is very simple.
-
-```js
-import auth0 from "auth0-js";
-
-import { AUTH_CONFIG } from "../constants/auth0-variables";
-
-const auth = new auth0.WebAuth({
-  domain: AUTH_CONFIG.domain,
-  clientID: AUTH_CONFIG.clientId,
-  redirectUri: AUTH_CONFIG.callbackUrl,
-  audience: `https://${AUTH_CONFIG.domain}/userinfo`,
-  responseType: "token id_token"
-});
-```
-
-The `auth` instance provides methods to start the login process, get user details etc. However, there is one complication, we have to provide this auth instance to multiple react components. There are many ways to solve this but we'll use the new Context Api.
-
 Create a file named `authContext.js` inside `src/` directory.
 
 ```js
@@ -214,9 +213,9 @@ import { createContext } from "react";
 const authContext = createContext({
   authenticated: false, // to check if authenticated or not
   user: {}, // store all the user details
-  accessToken: "", // accessToken of user for auth0
+  accessToken: "", // accessToken of user for Auth0
   initiateLogin: () => {}, // to start the login process
-  handleAuthentication: () => {}, // handle auth0 login process
+  handleAuthentication: () => {}, // handle Auth0 login process
   logout: () => {} // logout the user
 });
 
@@ -290,7 +289,7 @@ initiateLogin = () => {
 };
 ```
 
-`auth` instance has an `authorize` method. `initiateLogin` is just a wrapper around it. When the `authorize` method is called, a login page is shown. When the user fills the form, Auth0 redirects the user back to our app at `http://localhost:3000/callback`. The redirect url contains some important information for our app. The `handleAuthentication` method parses the url.
+`auth` instance has an `authorize` method. `initiateLogin` is just a wrapper around it. When the `authorize` method is called, the Auth0 login page is shown. When the user fills the form, Auth0 redirects the user back to our app at `http://localhost:3000/callback`. The redirect URL contains some important information for our app. The `handleAuthentication` method parses this URL to extract the `accessToken`, `idTokenPayload` etc.
 
 ```js
 handleAuthentication = () => {
@@ -301,47 +300,29 @@ handleAuthentication = () => {
       return;
     }
 
-    this.setSession(authResult);
+    this.setSession(authResult.idTokenPayload);
   });
 };
 ```
 
-After parsing the url it calls the `setSession` method to gather user data and store it.
+After parsing the URL it calls the `setSession` method to gather user data and store it.
 
 ```js
-setSession(authResult) {
-  const { accessToken } = authResult;
-  auth.client.userInfo(accessToken, (error, data) => {
-    if (error) {
-      console.log("Error Occured", error);
-      this.setState({
-        authenticated: false,
-        accessToken: "",
-        user: {
-          role: "visitor"
-        }
-      });
-      return;
-    }
-
-    const user = {
-      id: data.sub,
-      email: data.email,
-      role: data[AUTH_CONFIG.roleUrl]
-    };
-    
-  console.log(user);
-  
-    this.setState({
-      authenticated: true,
-      accessToken,
-      user
-    });
+setSession(data) {
+  const user = {
+    id: data.sub,
+    email: data.email,
+    role: data[AUTH_CONFIG.roleUrl]
+  };
+  this.setState({
+    authenticated: true,
+    accessToken: data.accessToken,
+    user
   });
 }
 ```
 
-The `setSession` is a private method which uses the `accessToken` field provided by `handleAuthentication` to fetch user data from Auth0 server via `auth.client.userInfo` method. The server provides details like email and role. The role received is the one computed by the function we saved on Auth0 dashboard. In our case, it will be available via `data["https://rbac-tutorial-app/role"]`. All the necessary user data are stored in `Auth` component's state. We are also logging the user data because the user id will be important later.
+The `setSession` is a private method which takes the data provided by `handleAuthentication` and saves it in the state of `Auth` component. The role received is the one computed by the function we saved on Auth0 dashboard. In our case, it will be available via `data["https://rbac-tutorial-app/role"]`. 
 
 Finally, to log the user out we just delete the stored user data in the state and revert the role to **visitor**.
 
@@ -359,7 +340,7 @@ logout = () => {
 
 The `Auth` component will now look like [this](https://github.com/itaditya/react-rbac-auth0-article-code/blob/master/src/components/Auth.js).
 
-With that covered, let's use the `Auth` component in our React app.  In the `src/index.js` wrap all the routing inside the `Auth` component. We will also add a route for the url `http://localhost:3000/callback` so that when Auth0 redirects the user back to this url, we can run the `handleAuthentication` method.
+With that covered, let's use the `Auth` component in our React app.  In the `src/index.js` wrap all the routing inside the `Auth` component. We will also add a route for the URL `http://localhost:3000/callback` so that when Auth0 redirects the user back to this URL, we can run the `handleAuthentication` method.
 
 ```js
 import React from "react";
@@ -393,7 +374,7 @@ const rootElement = document.getElementById("root");
 ReactDOM.render(<App />, rootElement);
 ```
 
-Create a file named `callback.js` inside `src/pages` directory. When users are redirected to this page, we check if the url contains important information. If it does, we call the `handleAuthentication` method provided by the `authContext`. It can be implemented like this.
+Create a file named `callback.js` inside `src/pages` directory. When users are redirected to this page, we check if the URL contains important information. If it does, we call the `handleAuthentication` method provided by the `authContext`. It can be implemented like this.
 
 ```js
 import React from "react";
@@ -415,13 +396,11 @@ const Callback = props => (
 export default Callback;
 ```
 
-Now let's quickly implement the Login and Logout buttons as components.
+Now let's quickly implement the Login and Logout buttons as components. Create two files named `Login.js` and `Logout.js` inside `src/components` directory.
 
-Login.js
+`Login.js` should have the following code:
 
 ```js
-// src/components/Login.js
-
 import React from "react";
 
 import { AuthConsumer } from "../authContext";
@@ -439,11 +418,9 @@ const Login = () => (
 export default Login;
 ```
 
-Logout.js
+and `Logout.js` should have this code:
 
 ```js
-// src/components/Logout.js
-
 import React from "react";
 
 import { AuthConsumer } from "../authContext";
@@ -461,7 +438,7 @@ const Logout = () => (
 export default Logout;
 ```
 
-The Home page should have the Login component.
+After creating these components, we can update the `Home` component to enable users to log in:
 
 ```js
 import React from "react";
@@ -699,7 +676,34 @@ export default DashboardPage;
 
 We check if the user can perform **dashboard-page:visit**. If yes, render the dashboard page content like Logout button, Profile data, list of Posts etc. If no, redirect the user to home page.
 
-Logout button component has already been implemented so now let's implement `PostsList` component and `Profile` component.
+Logout button component has already been implemented so now let's implement `Profile` component and `PostsList` component.
+
+`Profile` component takes user data from context and render the appropriate markup. It can be implemented like this
+
+```js
+import React from "react";
+
+import { AuthConsumer } from "../authContext";
+
+const Profile = () => (
+  <AuthConsumer>
+    {({ user }) => (
+      <div>
+        <h2>User Profile</h2>
+        <ul>
+          <li>ID: {user.id}</li>
+          <li>Email: {user.email}</li>
+          <li>Role: {user.role}</li>
+        </ul>
+      </div>
+    )}
+  </AuthConsumer>
+);
+
+export default Profile;
+```
+
+We will login with different accounts and keep a note of the role assigned to each account and the **user id** for each account. First we will login with the email which we configured Auth0 to assign admin role to. We can confirm if admin role is assigned by looking at `user.role` key. Then we will login with other accounts and we will get writer role. The **user id** will be useful later on.
 
 The `PostsList` component renders a table containing list of all posts. The posts written by the user logged in will show an Edit button alongside them. Admins are shown Edit button and Delete button for all the posts. Let's see how `PostsList` component can be implemented.
 
@@ -799,32 +803,7 @@ const posts = [
 export default posts;
 ```
 
-We will login with different emails to make multiple user accounts and we'll make the user, owner of certain posts by copying the user id in the `ownerId` field. The user's id can be found in the Console tab when we log in (due to the `console.log()` in `setSession()` method of `Auth` component).
-
-`Profile` component takes user data from context and render the appropriate markup. It can be implemented like this
-
-```js
-import React from "react";
-
-import { AuthConsumer } from "../authContext";
-
-const Profile = () => (
-  <AuthConsumer>
-    {({ user }) => (
-      <div>
-        <h2>User Profile</h2>
-        <ul>
-          <li>ID: {user.id}</li>
-          <li>Email: {user.email}</li>
-          <li>Role: {user.role}</li>
-        </ul>
-      </div>
-    )}
-  </AuthConsumer>
-);
-
-export default Profile;
-```
+We will take the various user ids and make the user, owner of certain posts by copying the user id in the `ownerId` field. Check [this](https://github.com/itaditya/react-rbac-auth0-article-code/blob/master/src/constants/posts.js) for reference.
 
 With all of the implementation covered, let's check if everything works properly. Open http://localhost:3000/. There we'll see a login button and a tabular list of posts. Since we haven't logged in yet, our role will default to visitor. Visitors are not allowed to edit or delete the posts so no edit and delete buttons will be shown.
 
